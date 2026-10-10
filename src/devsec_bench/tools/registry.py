@@ -106,7 +106,7 @@ class Registry:
             data = stream.read(MAX_FILE_BYTES + 1)
         if len(data) > MAX_FILE_BYTES or b"\x00" in data:
             raise ValueError("File read limit or binary file")
-        return data.decode("utf-8")
+        return data.decode("utf-8").replace("\r\n", "\n")
 
     def _execute(self, name: str, args: RepositoryArgs) -> dict[str, Any]:
         if name == "list_files":
