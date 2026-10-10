@@ -203,9 +203,15 @@ class LLMAgent:
                     ).cost(config.pricing)
                     if reservation is None or spent + reservation > config.max_cost:
                         return stop("budget", "Dollar reservation exceeds remaining budget")
-                reply = self.provider.complete(
-                    messages, registry.schemas(), config, min(config.request_timeout, remaining)
-                )
+                try:
+                    reply = self.provider.complete(
+                        messages, registry.schemas(), config, min(config.request_timeout, remaining)
+                    )
+                except Exception:
+                    # Failed requests may have consumed tokens without a usage response.
+                    # A previously known subtotal must not appear as a complete run total.
+                    known = False
+                    raise
                 received = True
                 if reply.usage.input_tokens is None or reply.usage.output_tokens is None:
                     known = False

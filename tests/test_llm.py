@@ -181,3 +181,36 @@ def test_provider_drip_stream_obeys_absolute_deadline():
     )
     assert output.status == "timeout"
     assert time.monotonic() - start < 0.5
+
+
+def test_failed_followup_does_not_report_partial_usage_as_total():
+    calls = 0
+
+    def handle(_):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(
+                200,
+                json=response(
+                    {
+                        "tool_calls": [
+                            {
+                                "id": "call1",
+                                "type": "function",
+                                "function": {"name": "list_files", "arguments": "{}"},
+                            }
+                        ]
+                    }
+                ),
+            )
+        return httpx.Response(503, text="provider failure")
+
+    scenario = discover()[0]
+    output = LLMAgent(provider(handle)).run(
+        scenario.context(),
+        Registry(scenario.repository, scenario.tools),
+        AgentConfig(agent="llm", model="test"),
+    )
+    assert output.status == "error"
+    assert output.usage.total_tokens is None
