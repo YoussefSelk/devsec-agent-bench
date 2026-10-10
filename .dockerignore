@@ -1,0 +1,14 @@
+.git
+.venv
+.bench
+.superpowers
+.env
+__pycache__
+*.db
+*.sqlite*
+dist
+build
+docs/assets
+.pytest_cache
+.mypy_cache
+.ruff_cache
