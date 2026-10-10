@@ -51,24 +51,58 @@ def validate() -> None:
 
 @app.command()
 def run(
-    agent: str = "reference", model: str | None = None, provider: str = "openai",
-    scenario: str | None = None, repetitions: int = 1, concurrency: int = 1,
-    seed: int = 0, max_iterations: int = 20, timeout: float = 30,
-    request_timeout: float = 20, max_cost: float | None = None,
-    pricing_file: Path | None = None, home: Home = Path(".bench"),
+    agent: str = "reference",
+    model: str | None = None,
+    provider: str = "openai",
+    scenario: str | None = None,
+    repetitions: int = 1,
+    concurrency: int = 1,
+    seed: int = 0,
+    max_iterations: int = 20,
+    timeout: float = 30,
+    request_timeout: float = 20,
+    max_cost: float | None = None,
+    pricing_file: Path | None = None,
+    home: Home = Path(".bench"),
     isolation: str = "local",
 ) -> None:
     """Execute source analysis; non-passing runs exit 1, invalid configuration exits 2."""
     try:
         prices = json.loads(pricing_file.read_text()) if pricing_file else {}
         pricing = Pricing.model_validate(prices[model]) if model in prices else None
-        config = AgentConfig.model_validate(dict(agent=agent, model=model, provider=provider, seed=seed, max_iterations=max_iterations, timeout=timeout, request_timeout=request_timeout, max_cost=max_cost, pricing=pricing))
+        config = AgentConfig.model_validate(
+            dict(
+                agent=agent,
+                model=model,
+                provider=provider,
+                seed=seed,
+                max_iterations=max_iterations,
+                timeout=timeout,
+                request_timeout=request_timeout,
+                max_cost=max_cost,
+                pricing=pricing,
+            )
+        )
         if isolation == "docker":
             from devsec_bench.isolation import docker_run
 
             if agent != "reference" or pricing_file or max_cost is not None:
                 raise ValueError("Restricted Docker mode supports offline reference runs only")
-            command = ["run", "--agent", "reference", "--repetitions", str(repetitions), "--concurrency", str(concurrency), "--seed", str(seed), "--max-iterations", str(max_iterations), "--timeout", str(timeout)]
+            command = [
+                "run",
+                "--agent",
+                "reference",
+                "--repetitions",
+                str(repetitions),
+                "--concurrency",
+                str(concurrency),
+                "--seed",
+                str(seed),
+                "--max-iterations",
+                str(max_iterations),
+                "--timeout",
+                str(timeout),
+            ]
             if scenario:
                 command += ["--scenario", scenario]
             raise typer.Exit(docker_run(home, command, timeout * max(1, repetitions) * 8 + 30))
@@ -81,10 +115,16 @@ def run(
         result = run_suite(scenarios, config, repetitions, concurrency, database.save)
         export(result, home / "reports")
         stats = summary(result)
-        typer.echo(f'Run {result.id} | {agent} | {stats["passed"]}/{stats["scenarios"]} passed | policy violations {stats["policy_violations"]}')
+        typer.echo(
+            f"Run {result.id} | {agent} | {stats['passed']}/{stats['scenarios']} passed | policy violations {stats['policy_violations']}"
+        )
         for item in result.results:
-            typer.echo(f'{item.scenario} {"PASS" if item.metrics.passed else "FAIL"} precision={item.metrics.precision:.2f} recall={item.metrics.recall:.2f} tools={len(item.events)} duration={item.duration:.3f}s status={item.output.status}')
-        typer.echo(f'Tokens: {stats["total_tokens"] if stats["total_tokens"] is not None else "unavailable"} | USD: {stats["estimated_cost"] if stats["estimated_cost"] is not None else "unavailable"}')
+            typer.echo(
+                f"{item.scenario} {'PASS' if item.metrics.passed else 'FAIL'} precision={item.metrics.precision:.2f} recall={item.metrics.recall:.2f} tools={len(item.events)} duration={item.duration:.3f}s status={item.output.status}"
+            )
+        typer.echo(
+            f"Tokens: {stats['total_tokens'] if stats['total_tokens'] is not None else 'unavailable'} | USD: {stats['estimated_cost'] if stats['estimated_cost'] is not None else 'unavailable'}"
+        )
         if result.interrupted:
             raise typer.Exit(130)
         if not all(r.metrics.passed for r in result.results):
@@ -124,7 +164,26 @@ def dashboard(home: Home = Path(".bench"), port: int = 8501) -> None:
 
     environment = dict(os.environ, DEVSEC_BENCH_HOME=str(home.resolve()))
     script = Path(__file__).parent / "dashboard" / "app.py"
-    raise typer.Exit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(script), "--server.port", str(port), "--server.address", "127.0.0.1", "--browser.gatherUsageStats", "false"], env=environment))
+    raise typer.Exit(
+        subprocess.call(
+            [
+                sys.executable,
+                "-m",
+                "streamlit",
+                "run",
+                str(script),
+                "--server.port",
+                str(port),
+                "--server.address",
+                "127.0.0.1",
+                "--browser.gatherUsageStats",
+                "false",
+                "--theme.base",
+                "light",
+            ],
+            env=environment,
+        )
+    )
 
 
 if __name__ == "__main__":
