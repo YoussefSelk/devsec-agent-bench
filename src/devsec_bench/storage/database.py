@@ -1,6 +1,5 @@
 """SQLite tables remain separate from benchmark domain objects."""
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +43,7 @@ def sanitized_run(run: Run) -> Run:
         if isinstance(value, str):
             return sanitize(value)
         if isinstance(value, dict):
-            return {key: clean(item) for key, item in value.items()}
+            return {sanitize(key): clean(item) for key, item in value.items()}
         if isinstance(value, list):
             return [clean(item) for item in value]
         return value
@@ -55,7 +54,9 @@ def sanitized_run(run: Run) -> Run:
 class Database:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f"sqlite:///{path.resolve().as_posix()}", connect_args={"timeout": 30})
+        self.engine = create_engine(
+            f"sqlite:///{path.resolve().as_posix()}", connect_args={"timeout": 30}
+        )
         Base.metadata.create_all(self.engine)
 
     def save(self, run: Run) -> None:
@@ -64,20 +65,39 @@ class Database:
             old = session.get(RunRow, run.id)
             if old:
                 results = session.scalars(select(ResultRow).where(ResultRow.run_id == run.id)).all()
-                for result in results:
-                    for event in session.scalars(select(EventRow).where(EventRow.result_id == result.id)):
-                        session.delete(event)
-                    session.delete(result)
+                for previous_result in results:
+                    for previous_event in session.scalars(
+                        select(EventRow).where(EventRow.result_id == previous_result.id)
+                    ):
+                        session.delete(previous_event)
+                    session.delete(previous_result)
                 old.snapshot = run.model_dump(mode="json", exclude={"results"})
             else:
-                session.add(RunRow(id=run.id, timestamp=run.timestamp, snapshot=run.model_dump(mode="json", exclude={"results"})))
+                session.add(
+                    RunRow(
+                        id=run.id,
+                        timestamp=run.timestamp,
+                        snapshot=run.model_dump(mode="json", exclude={"results"}),
+                    )
+                )
             session.flush()
             for result in run.results:
-                row = ResultRow(run_id=run.id, scenario=result.scenario, repetition=result.repetition, snapshot=result.model_dump(mode="json", exclude={"events"}))
+                row = ResultRow(
+                    run_id=run.id,
+                    scenario=result.scenario,
+                    repetition=result.repetition,
+                    snapshot=result.model_dump(mode="json", exclude={"events"}),
+                )
                 session.add(row)
                 session.flush()
                 for event in result.events:
-                    session.add(EventRow(result_id=row.id, sequence=event.sequence, snapshot=event.model_dump(mode="json")))
+                    session.add(
+                        EventRow(
+                            result_id=row.id,
+                            sequence=event.sequence,
+                            snapshot=event.model_dump(mode="json"),
+                        )
+                    )
 
     def get(self, run_id: str) -> Run:
         with Session(self.engine) as session:
@@ -85,8 +105,19 @@ class Database:
             if row is None:
                 raise ValueError("Run not found")
             results = []
-            for result in session.scalars(select(ResultRow).where(ResultRow.run_id == run_id).order_by(ResultRow.scenario, ResultRow.repetition)):
-                events = [ToolEvent.model_validate(event.snapshot) for event in session.scalars(select(EventRow).where(EventRow.result_id == result.id).order_by(EventRow.sequence))]
+            for result in session.scalars(
+                select(ResultRow)
+                .where(ResultRow.run_id == run_id)
+                .order_by(ResultRow.scenario, ResultRow.repetition)
+            ):
+                events = [
+                    ToolEvent.model_validate(event.snapshot)
+                    for event in session.scalars(
+                        select(EventRow)
+                        .where(EventRow.result_id == result.id)
+                        .order_by(EventRow.sequence)
+                    )
+                ]
                 results.append(ScenarioResult.model_validate({**result.snapshot, "events": events}))
             return Run.model_validate({**row.snapshot, "results": results})
 

@@ -15,7 +15,18 @@ def registry(tmp_path):
     return Registry(tmp_path, list(TOOLS))
 
 
-@pytest.mark.parametrize("path", ["../outside", "/etc/passwd", "C:/Windows/win.ini", ".env", ".git/config", "id_rsa", "a:stream"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "../outside",
+        "/etc/passwd",
+        "C:/Windows/win.ini",
+        ".env",
+        ".git/config",
+        "id_rsa",
+        "a:stream",
+    ],
+)
 def test_rejects_path_and_secret_access(registry, path):
     assert "error" in registry.call("read_file", {"path": path})
     assert registry.events[-1].authorized is False
@@ -24,7 +35,11 @@ def test_rejects_path_and_secret_access(registry, path):
 
 def test_allowlist_unknown_repo_and_no_write(registry):
     registry.allowed = {"list_files"}
-    for name, args in [("read_file", {"path": "app.py"}), ("write_file", {}), ("list_files", {"repository": "host"})]:
+    for name, args in [
+        ("read_file", {"path": "app.py"}),
+        ("write_file", {}),
+        ("list_files", {"repository": "host"}),
+    ]:
         assert "error" in registry.call(name, args)
     assert (registry.root / "app.py").read_text() == "print('synthetic')\n"
 
@@ -54,3 +69,8 @@ def test_bad_arguments_and_budget_are_traced(registry):
     assert "error" in registry.call("search_code", {"query": ""})
     registry.max_calls = len(registry.events)
     assert "error" in registry.call("list_files", {})
+
+
+def test_untrusted_argument_keys_are_never_retained(registry):
+    registry.call("list_files", {"sk-SENSITIVE_PRIVATE_ARGUMENT_KEY": "value"})
+    assert "SENSITIVE_PRIVATE" not in registry.events[-1].model_dump_json()

@@ -28,13 +28,19 @@ class SearchArgs(RepositoryArgs):
 
 
 ARG_MODELS: dict[str, type[RepositoryArgs]] = {
-    name: FileArgs if name in {"read_file", "read_manifest"} else SearchArgs if name == "search_code" else RepositoryArgs
+    name: FileArgs
+    if name in {"read_file", "read_manifest"}
+    else SearchArgs
+    if name == "search_code"
+    else RepositoryArgs
     for name in TOOLS
 }
 
 
 class Registry:
-    def __init__(self, root: Path, allowed: list[str], max_calls: int = 100, deadline: float | None = None):
+    def __init__(
+        self, root: Path, allowed: list[str], max_calls: int = 100, deadline: float | None = None
+    ):
         if root.is_symlink() or not root.is_dir():
             raise PolicyError("Invalid authorized repository")
         self.root = root.resolve()
@@ -44,7 +50,17 @@ class Registry:
         self.events: list[ToolEvent] = []
 
     def schemas(self) -> list[dict[str, Any]]:
-        return [{"type": "function", "function": {"name": name, "description": f"Read-only repository tool: {name}", "parameters": ARG_MODELS[name].model_json_schema()}} for name in sorted(self.allowed)]
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": f"Read-only repository tool: {name}",
+                    "parameters": ARG_MODELS[name].model_json_schema(),
+                },
+            }
+            for name in sorted(self.allowed)
+        ]
 
     def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         start = time.monotonic()
@@ -80,7 +96,19 @@ class Registry:
             error = "Tool failed or resource limit exceeded"
             result = {"error": error}
         # No user-controlled argument values or returned file bodies enter a trace.
-        self.events.append(ToolEvent(sequence=len(self.events) + 1, tool=name if name in TOOLS else "unknown", arguments={key: "[omitted]" for key in list(arguments)[:10]}, authorized=authorized, error=error, bytes_returned=len(json.dumps(result).encode()), duration=time.monotonic() - start))
+        self.events.append(
+            ToolEvent(
+                sequence=len(self.events) + 1,
+                tool=name if name in TOOLS else "unknown",
+                arguments={
+                    key: "[omitted]" for key in ("repository", "path", "query") if key in arguments
+                },
+                authorized=authorized,
+                error=error,
+                bytes_returned=len(json.dumps(result).encode()),
+                duration=time.monotonic() - start,
+            )
+        )
         return result
 
     def files(self) -> list[str]:
@@ -113,7 +141,12 @@ class Registry:
             return {"files": self.files()}
         if name in {"read_file", "read_manifest"}:
             assert isinstance(args, FileArgs)
-            if name == "read_manifest" and Path(args.path).name not in {"requirements.txt", "pyproject.toml", "package.json", "config.yaml"}:
+            if name == "read_manifest" and Path(args.path).name not in {
+                "requirements.txt",
+                "pyproject.toml",
+                "package.json",
+                "config.yaml",
+            }:
                 raise PolicyError("Manifest not permitted")
             return {"path": args.path, "content": self.read(args.path)}
         if name == "search_code":
@@ -129,15 +162,28 @@ class Registry:
         if name == "inspect_dependencies":
             files = self.files()
             requirements = self.read("requirements.txt") if "requirements.txt" in files else ""
-            advisories = json.loads(self.read("advisories.json")) if "advisories.json" in files else {}
+            advisories = (
+                json.loads(self.read("advisories.json")) if "advisories.json" in files else {}
+            )
             dependencies = []
-            for line in requirements.splitlines():
-                if "==" in line and not line.startswith("#"):
-                    package, version = line.strip().split("==", 1)
+            for requirement in requirements.splitlines():
+                if "==" in requirement and not requirement.startswith("#"):
+                    package, version = requirement.strip().split("==", 1)
                     advisory = advisories.get(package, {})
-                    dependencies.append({"name": package, "version": version, "vulnerable": version in advisory.get("affected", []), "fixed": advisory.get("fixed"), "advisory": advisory.get("id")})
+                    dependencies.append(
+                        {
+                            "name": package,
+                            "version": version,
+                            "vulnerable": version in advisory.get("affected", []),
+                            "fixed": advisory.get("fixed"),
+                            "advisory": advisory.get("id"),
+                        }
+                    )
             return {"dependencies": dependencies, "source": "pinned local synthetic advisories"}
         if name == "inspect_git_diff":
             # Do not invoke git: configs, filters and external diff drivers can execute code.
-            return {"diff": self.read("changes.diff") if "changes.diff" in self.files() else "", "source": "optional fixture changes.diff; no git process"}
+            return {
+                "diff": self.read("changes.diff") if "changes.diff" in self.files() else "",
+                "source": "optional fixture changes.diff; no git process",
+            }
         return {"repository": "target", "file_count": len(self.files()), "read_only": True}

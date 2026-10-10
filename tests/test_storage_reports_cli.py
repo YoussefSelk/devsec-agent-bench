@@ -16,7 +16,7 @@ from devsec_bench.storage.database import Database
 
 def test_database_roundtrip_and_sanitized_reports(tmp_path: Path):
     run = run_suite(discover()[:2], AgentConfig())
-    run.results[0].output.findings[0].explanation = 'api_key=sk-THIS_IS_A_PRIVATE_TOKEN'
+    run.results[0].output.findings[0].explanation = "api_key=sk-THIS_IS_A_PRIVATE_TOKEN"
     database = Database(tmp_path / "history.db")
     database.save(run)
     loaded = database.get(run.id)
@@ -41,12 +41,22 @@ def test_comparison_uses_measured_runs():
     assert result["runs"][0]["estimated_cost"] is None
 
 
+def test_quoted_json_secrets_are_sanitized():
+    from devsec_bench.tools.policies import sanitize
+
+    text = '{"password": "private-test-password", "api_key": "private-key"}'
+    assert "private-test" not in sanitize(text)
+    assert "private-key" not in sanitize(text)
+
+
 def test_cli_end_to_end(tmp_path: Path):
     runner = CliRunner()
     assert runner.invoke(app, ["init", "--home", str(tmp_path)]).exit_code == 0
     assert runner.invoke(app, ["list"]).exit_code == 0
     assert runner.invoke(app, ["validate"]).exit_code == 0
-    result = runner.invoke(app, ["run", "--agent", "reference", "--home", str(tmp_path), "--concurrency", "2"])
+    result = runner.invoke(
+        app, ["run", "--agent", "reference", "--home", str(tmp_path), "--concurrency", "2"]
+    )
     assert result.exit_code == 0, result.output
     assert "8/8" in result.output
     report = runner.invoke(app, ["report", "--latest", "--home", str(tmp_path)])
@@ -54,12 +64,16 @@ def test_cli_end_to_end(tmp_path: Path):
     db = Database(tmp_path / "history.db")
     run_id = db.latest().id
     assert runner.invoke(app, ["compare", run_id, run_id, "--home", str(tmp_path)]).exit_code == 0
-    assert runner.invoke(app, ["run", "--scenario", "unknown", "--home", str(tmp_path)]).exit_code != 0
+    assert (
+        runner.invoke(app, ["run", "--scenario", "unknown", "--home", str(tmp_path)]).exit_code != 0
+    )
 
 
 def test_missing_credentials_clean_failure(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    result = CliRunner().invoke(app, ["run", "--agent", "llm", "--model", "caller-model", "--home", str(tmp_path)])
+    result = CliRunner().invoke(
+        app, ["run", "--agent", "llm", "--model", "caller-model", "--home", str(tmp_path)]
+    )
     assert result.exit_code != 0
     assert "OPENAI_API_KEY" in result.output
     assert "Traceback" not in result.output
