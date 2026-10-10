@@ -20,7 +20,7 @@ jobs:
       - run: uv sync --frozen --extra dev
       - run: uv run --frozen ruff check .
       - run: uv run --frozen ruff format --check .
-      - run: uv run --frozen mypy src
+      - run: uv run --frozen mypy src --python-version ${{ matrix.python }}
       - run: uv run --frozen pytest --junitxml=.bench/tests.xml
       - run: uv build
       - run: uv run --frozen devsec-bench validate
