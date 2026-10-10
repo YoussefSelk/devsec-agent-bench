@@ -11,7 +11,9 @@ from devsec_bench.evaluation.comparison import summary
 from devsec_bench.reporting.exporters import html_report, rows
 from devsec_bench.storage.database import Database
 
-st.set_page_config(page_title="DevSec Agent Bench", page_icon="🛡", layout="wide")
+st.set_page_config(
+    page_title="DevSec Agent Bench", page_icon="🛡", layout="wide", initial_sidebar_state="collapsed"
+)
 st.markdown(
     "<style>.block-container{padding-top:2rem}div[data-testid=stMetric]{background:#f0f4f8;color:#183047;padding:16px;border-radius:8px}h1{letter-spacing:-.04em}@media(max-width:900px){div[data-testid=stHorizontalBlock]:has(div[data-testid=stMetric]){flex-wrap:wrap}div[data-testid=stColumn]:has(div[data-testid=stMetric]){min-width:180px;flex:1 1 180px}}</style>",
     unsafe_allow_html=True,
@@ -22,9 +24,12 @@ home = Path(os.environ.get("DEVSEC_BENCH_HOME", ".bench"))
 database = Database(home / "history.db")
 runs = database.list_runs()
 st.sidebar.title("Explore benchmark history")
+views = ["Overview", "Benchmark Results", "Agent Comparison", "Execution Traces", "Reports"]
+requested_view = st.query_params.get("view", "Overview")
 page = st.sidebar.radio(
-    "View", ["Overview", "Benchmark Results", "Agent Comparison", "Execution Traces", "Reports"]
+    "View", views, index=views.index(requested_view) if requested_view in views else 0
 )
+st.query_params["view"] = page
 if not runs:
     st.info("No measured results yet. Run: devsec-bench run --agent reference")
     st.stop()
@@ -78,7 +83,7 @@ if page == "Overview":
             color="agent",
             title="Success rate by measured run",
             range_y=[0, 1],
-            labels={"id": "Run ID", "success_rate": "Success rate"},
+            labels={"run_label": "Run", "success_rate": "Success rate"},
         ),
         width="stretch",
     )
@@ -130,6 +135,7 @@ elif page == "Agent Comparison":
             y="success_rate",
             color="agent",
             title="Success by configuration",
+            labels={"run_label": "Run", "success_rate": "Success rate"},
             range_y=[0, 1],
         ),
         width="stretch",
@@ -141,6 +147,7 @@ elif page == "Agent Comparison":
             y="average_latency",
             color="agent",
             title="Measured mean latency",
+            labels={"run_label": "Run", "average_latency": "Mean latency (s)"},
         ),
         width="stretch",
     )
