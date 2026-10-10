@@ -115,3 +115,18 @@ def test_corrupt_history_has_clear_error_state(tmp_path: Path, monkeypatch):
     ).run(timeout=30)
     assert not test.exception
     assert any("could not be read" in error.value for error in test.error)
+
+
+def test_run_action_preserves_corrupt_history_without_traceback(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("DEVSEC_BENCH_HOME", str(tmp_path))
+    path = tmp_path / "history.db"
+    path.write_text("invalid database")
+    test = AppTest.from_file(
+        str(Path(__file__).parents[1] / "src/devsec_bench/dashboard/app.py")
+    ).run(timeout=30)
+    next(button for button in test.button if button.label == "Start reference run").click().run(
+        timeout=30
+    )
+    assert not test.exception
+    assert path.read_text() == "invalid database"
+    assert any("could not be completed" in error.value for error in test.error)

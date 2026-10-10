@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 from devsec_bench.benchmarks.loader import discover
-from devsec_bench.dashboard.theme import COLORS, chart, status_badge, value
+from devsec_bench.dashboard.theme import COLORS, STATUS_COLORS, chart, status_badge, value
 from devsec_bench.dashboard.views import (
     history_rows,
     model_rollup,
@@ -134,7 +134,10 @@ def benchmark_runs(runs: list[Run]) -> None:
     display["Run ID"] = display["Run ID"].str.slice(0, 8)
     display["Execution date"] = display["Execution date"].str.slice(0, 19).str.replace("T", " ")
     st.dataframe(
-        display,
+        display.style.map(
+            lambda label: f"color: {COLORS[STATUS_COLORS.get(label, 'muted')]}; font-weight: 600",
+            subset=["Status"],
+        ),
         hide_index=True,
         width="stretch",
         column_order=[

@@ -31,7 +31,7 @@ CSS = """
 <style>
 .stApp {background:#0B0F17;color:#F1F5F9}
 [data-testid=stSidebar] {background:#111827;border-right:1px solid #2A3546}
-.block-container {padding:2rem 2.2rem 3rem;max-width:1600px}
+.block-container {padding:4rem 2.2rem 3rem;max-width:1600px}
 h1 {font-size:2rem!important;font-weight:650!important;letter-spacing:-.035em}
 h2,h3 {letter-spacing:-.02em}
 [data-testid=stCaptionContainer] {color:#94A3B8}
@@ -48,7 +48,9 @@ h2,h3 {letter-spacing:-.02em}
 .eyebrow {margin-bottom:8px}
 .status {display:inline-block;padding:4px 9px;border:1px solid #2A3546;border-radius:5px;font-size:11px;font-weight:600}
 .mono {font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:#94A3B8}
-@media(max-width:900px){.block-container{padding:1.3rem 1rem}h1{font-size:1.65rem!important}
+@media(max-width:900px){.block-container{padding:4rem 1rem 2rem}h1{font-size:1.65rem!important}
+div[data-testid=stHorizontalBlock]:has(div[data-testid=stPopover]){flex-wrap:wrap}
+div[data-testid=stColumn]:has(div[data-testid=stPopover]){min-width:160px;flex:1 1 160px}
 div[data-testid=stHorizontalBlock]:has(div[data-testid=stMetric]){flex-wrap:wrap}
 div[data-testid=stColumn]:has(div[data-testid=stMetric]){min-width:160px;flex:1 1 160px}}
 </style>

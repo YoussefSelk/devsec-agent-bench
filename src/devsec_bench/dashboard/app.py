@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import streamlit as st
+from sqlalchemy.exc import SQLAlchemyError
 
 from devsec_bench.benchmarks.loader import discover
 from devsec_bench.benchmarks.runner import run_suite
@@ -120,8 +121,9 @@ with action:
                 for scenario in definitions
                 if target == "All scenarios" or scenario.id == target
             ]
-            database = Database(database_path)
+            database: Database | None = None
             try:
+                database = Database(database_path)
                 with st.spinner("Evaluating authorized repositories…"):
                     result = run_suite(
                         scenarios,
@@ -136,12 +138,13 @@ with action:
                 )
                 history.clear()
                 st.rerun()
-            except (ValueError, OSError):
+            except (ValueError, OSError, SQLAlchemyError):
                 st.error(
                     "The evaluation could not be completed. Check the configured history directory and execution limits."
                 )
             finally:
-                database.engine.dispose()
+                if database is not None:
+                    database.engine.dispose()
 
 if "launch_notice" in st.session_state:
     st.info(st.session_state.pop("launch_notice"))
