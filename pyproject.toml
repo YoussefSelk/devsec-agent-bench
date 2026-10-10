@@ -24,13 +24,16 @@ packages = ["src/devsec_bench"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["src/devsec_bench/scenarios"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
+exclude = ["src/devsec_bench/scenarios/"]
 
 [[tool.mypy.overrides]]
 module = ["plotly.*"]

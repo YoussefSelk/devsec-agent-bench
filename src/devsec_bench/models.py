@@ -6,7 +6,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-TOOLS = frozenset({"list_files", "read_file", "search_code", "read_manifest", "inspect_dependencies", "inspect_git_diff", "get_repository_metadata"})
+TOOLS = frozenset(
+    {
+        "list_files",
+        "read_file",
+        "search_code",
+        "read_manifest",
+        "inspect_dependencies",
+        "inspect_git_diff",
+        "get_repository_metadata",
+    }
+)
 
 
 class StrictModel(BaseModel):
@@ -100,7 +110,10 @@ class Usage(StrictModel):
     def cost(self, pricing: Pricing | None) -> float | None:
         if pricing is None or self.input_tokens is None or self.output_tokens is None:
             return None
-        return (self.input_tokens * pricing.input_per_million + self.output_tokens * pricing.output_per_million) / 1_000_000
+        return (
+            self.input_tokens * pricing.input_per_million
+            + self.output_tokens * pricing.output_per_million
+        ) / 1_000_000
 
 
 class ToolEvent(StrictModel):
