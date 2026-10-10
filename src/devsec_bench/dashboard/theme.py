@@ -1,4 +1,4 @@
-"""Restrained theme tokens and reusable presentation primitives."""
+"""Small editorial design system using native accessible Streamlit controls."""
 
 import html
 from typing import Any
@@ -7,15 +7,19 @@ import plotly.graph_objects as go
 import streamlit as st
 
 COLORS = {
-    "background": "#0B0F17",
-    "surface": "#161E2D",
-    "border": "#2A3546",
-    "text": "#F1F5F9",
-    "muted": "#94A3B8",
-    "blue": "#3B82F6",
-    "green": "#10B981",
-    "amber": "#F59E0B",
-    "red": "#EF4444",
+    "canvas": "#F7F6F2",
+    "background": "#F7F6F2",
+    "surface": "#FFFFFF",
+    "secondary": "#F0EFEA",
+    "border": "#DEDCD5",
+    "control_border": "#85877F",
+    "text": "#222321",
+    "muted": "#686A65",
+    "accent": "#8C3B32",
+    "green": "#37654D",
+    "amber": "#7B5A20",
+    "red": "#8C3B32",
+    "blue": "#8C3B32",
 }
 STATUS_COLORS = {
     "Passed": "green",
@@ -25,35 +29,33 @@ STATUS_COLORS = {
     "Budget exhausted": "amber",
     "Interrupted": "amber",
     "Evaluation failed": "red",
+    "Pending": "muted",
 }
-
 CSS = """
 <style>
-.stApp {background:#0B0F17;color:#F1F5F9}
-[data-testid=stSidebar] {background:#111827;border-right:1px solid #2A3546}
-.block-container {padding:4rem 2.2rem 3rem;max-width:1600px}
-h1 {font-size:2rem!important;font-weight:650!important;letter-spacing:-.035em}
-h2,h3 {letter-spacing:-.02em}
-[data-testid=stCaptionContainer] {color:#94A3B8}
-[data-testid=stMetric] {background:#161E2D;border:1px solid #2A3546;border-radius:9px;padding:1.1rem;min-height:115px}
-[data-testid=stMetricLabel] {color:#94A3B8;font-size:.8rem}
-[data-testid=stMetricValue] {font-size:1.6rem;font-weight:600;letter-spacing:-.03em;color:#F1F5F9}
-div[data-testid=stHorizontalBlock]:has(div[data-testid=stMetric]){flex-wrap:wrap}
-div[data-testid=stColumn]:has(div[data-testid=stMetric]){min-width:190px;flex:1 1 190px}
-[data-testid=stVerticalBlockBorderWrapper] > div {border-color:#2A3546!important;border-radius:9px}
-[data-testid=stDataFrame] {border:1px solid #2A3546;border-radius:8px}
-[data-testid=stSidebar] label:has(input:checked) {background:#1E293B;border-radius:6px}
-.brand {display:flex;align-items:center;gap:12px;margin:0 0 22px}
-.brand-mark {background:#1D4ED8;color:white;font-weight:750;font-size:14px;padding:10px;border-radius:7px;letter-spacing:-.5px}
-.brand-name {font-size:15px;font-weight:650;line-height:1.35}
-.brand-subtitle,.eyebrow {font-size:10px;color:#94A3B8;letter-spacing:.13em;text-transform:uppercase}
-.eyebrow {margin-bottom:8px}
-.status {display:inline-block;padding:4px 9px;border:1px solid #2A3546;border-radius:5px;font-size:11px;font-weight:600}
-.mono {font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:#94A3B8}
-@media(max-width:900px){.block-container{padding:4rem 1rem 2rem}h1{font-size:1.65rem!important}
-div[data-testid=stHorizontalBlock]:has(div[data-testid=stPopover]){flex-wrap:wrap}
-div[data-testid=stColumn]:has(div[data-testid=stPopover]){min-width:160px;flex:1 1 160px}
-}
+.stApp{background:#F7F6F2;color:#222321}
+.block-container{max-width:1180px;padding:3.8rem 2rem 2rem}
+h1{font-size:2rem!important;letter-spacing:-.035em;font-weight:650!important}
+h2{font-size:1.45rem!important;letter-spacing:-.025em}
+h3{font-size:1.1rem!important;letter-spacing:-.01em}
+[data-testid=stCaptionContainer]{color:#686A65;opacity:1}
+.wordmark{font-size:15px;letter-spacing:.08em;font-weight:700;border-left:3px solid #8C3B32;padding-left:12px}
+.wordmark span{font-weight:400;letter-spacing:.025em;margin-left:7px}
+.eyebrow{color:#686A65;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.mono{font-family:ui-monospace,"Source Code Pro",Consolas,monospace;font-size:12px}
+.status{font-size:13px;font-weight:650}
+[data-testid=stMarkdownContainer] hr{border-color:#DEDCD5;margin:12px 0}
+button,input,[data-baseweb=select]>div{border-radius:2px!important;box-shadow:none!important}
+button,[data-testid=stTextInputRootElement],[data-testid=stNumberInputContainer],.react-aria-ComboBox [role=group]{border-color:#85877F!important}
+.react-aria-ComboBox [role=group]{border-radius:2px}
+button{min-height:40px}
+button:focus-visible,input:focus-visible,[role=radio]:focus-visible{outline:2px solid #8C3B32!important;outline-offset:3px}
+[data-testid=stDataFrame],[data-testid=stExpander]{border-radius:2px;border-color:#DEDCD5}
+[data-testid=stAlert]{border-radius:2px;background:#F0EFEA;color:#222321}
+[data-testid=stMetric]{background:none;border:none;padding:0}
+[data-testid=stMetricValue]{font-size:1.35rem}
+@media(max-width:640px){.block-container{padding:3.6rem 1rem 1.5rem}h1{font-size:1.65rem!important}
+button{min-height:44px}[data-testid=stRadio] label p{font-size:.85rem}}
 </style>
 """
 
@@ -74,15 +76,18 @@ def chart(figure: go.Figure, height: int = 280) -> None:
     figure.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"family": "Inter, system-ui, sans-serif", "color": COLORS["muted"], "size": 11},
-        margin={"l": 10, "r": 10, "t": 20, "b": 15},
+        font={
+            "family": "Source Sans Pro, system-ui, sans-serif",
+            "color": COLORS["text"],
+            "size": 12,
+        },
+        margin={"l": 12, "r": 12, "t": 20, "b": 15},
         height=height,
-        legend={"orientation": "h", "y": -0.22, "title": {"text": ""}},
-        hoverlabel={"bgcolor": "#1E293B", "font_color": COLORS["text"]},
-        colorway=[COLORS["blue"], COLORS["green"], COLORS["amber"], COLORS["red"]],
+        colorway=[COLORS["accent"]],
+        showlegend=False,
     )
-    figure.update_xaxes(gridcolor=COLORS["border"], zeroline=False, showgrid=False, automargin=True)
-    figure.update_yaxes(gridcolor=COLORS["border"], zeroline=False, automargin=True)
+    figure.update_xaxes(gridcolor=COLORS["border"], zerolinecolor=COLORS["muted"], automargin=True)
+    figure.update_yaxes(gridcolor=COLORS["border"], automargin=True)
     st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
 
 
