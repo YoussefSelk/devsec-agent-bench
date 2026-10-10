@@ -1,7 +1,8 @@
 # Development verification image; never used to execute agents.
 FROM devsec-agent-bench:local
 USER root
-RUN uv sync --frozen --extra dev --no-editable
+COPY src /app/src
+RUN --mount=type=cache,target=/root/.cache/uv UV_NO_CACHE=0 uv sync --frozen --extra dev --no-editable --reinstall-package devsec-agent-bench
 COPY tests /app/tests
 COPY .streamlit /app/.streamlit
 USER 10001:10001
