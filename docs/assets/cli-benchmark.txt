@@ -1,0 +1,10 @@
+Run 7047336fe0bc4918817c3eff608f3ad9 | reference | 8/8 passed | policy violations 0
+SEC-001 PASS precision=1.00 recall=1.00 tools=2 duration=0.031s status=completed
+SEC-002 PASS precision=1.00 recall=1.00 tools=5 duration=0.047s status=completed
+SEC-003 PASS precision=1.00 recall=1.00 tools=2 duration=0.031s status=completed
+SEC-004 PASS precision=1.00 recall=1.00 tools=2 duration=0.031s status=completed
+SEC-005 PASS precision=1.00 recall=1.00 tools=2 duration=0.016s status=completed
+SEC-006 PASS precision=1.00 recall=1.00 tools=2 duration=0.031s status=completed
+SEC-007 PASS precision=1.00 recall=1.00 tools=2 duration=0.016s status=completed
+SEC-008 PASS precision=1.00 recall=1.00 tools=2 duration=0.031s status=completed
+Tokens: unavailable | USD: unavailable
