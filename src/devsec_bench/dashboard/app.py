@@ -1,48 +1,28 @@
-"""Dark, evidence-driven dashboard shell; benchmark business logic stays in the runner."""
+"""Editorial, task-oriented evaluation workbench over the existing benchmark engine."""
 
 import os
 from pathlib import Path
 
 import streamlit as st
-from sqlalchemy.exc import SQLAlchemyError
 
-from devsec_bench.benchmarks.loader import discover
-from devsec_bench.benchmarks.runner import run_suite
-from devsec_bench.dashboard import pages
+from devsec_bench.dashboard import inspection, pages, wizard
 from devsec_bench.dashboard.theme import apply_theme
-from devsec_bench.models import AgentConfig, Run
-from devsec_bench.reporting.exporters import export
+from devsec_bench.models import Run
 from devsec_bench.storage.database import Database
 
-VIEWS = [
-    "Overview",
-    "Benchmark Runs",
-    "Scenarios",
-    "Agent Comparison",
-    "Execution Traces",
-    "Reports",
-    "Settings",
-]
-DESCRIPTIONS = {
-    "Overview": "Security-agent performance, safety and operational cost across measured evaluations.",
-    "Benchmark Runs": "Filter measured outcomes and inspect finding quality, execution failures and safety decisions.",
-    "Scenarios": "Explore the authorized task catalog, repository permissions and reproducible evaluation criteria.",
-    "Agent Comparison": "Compare observed quality, latency and available cost across agent configurations.",
-    "Execution Traces": "Inspect chronological tool requests, authorization decisions and evaluation evidence.",
-    "Reports": "Export sanitized, reproducible evidence from your evaluation history.",
-    "Settings": "Configure offline execution defaults and inspect the local security boundary.",
-}
-ICONS = {
-    "Overview": "◫",
-    "Benchmark Runs": "▤",
-    "Scenarios": "◇",
-    "Agent Comparison": "⇄",
-    "Execution Traces": "⌘",
-    "Reports": "▥",
-    "Settings": "⚙",
+NAVIGATION = ["Runs", "Benchmarks", "Compare", "Documentation"]
+ALIASES = {
+    "Overview": "Runs",
+    "Benchmark Runs": "Runs",
+    "Benchmark Results": "Runs",
+    "Scenarios": "Benchmarks",
+    "Agent Comparison": "Compare",
+    "Execution Traces": "Runs",
+    "Reports": "Runs",
+    "Settings": "Documentation",
 }
 
-st.set_page_config(page_title="DevSec Agent Bench", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="DevSec Agent Bench", layout="wide")
 apply_theme()
 home = Path(os.environ.get("DEVSEC_BENCH_HOME", ".bench")).resolve()
 database_path = home / "history.db"
@@ -57,133 +37,75 @@ def history(path: str, revision: int) -> list[Run]:
         database.engine.dispose()
 
 
-def read_history() -> list[Run]:
+if "_navigate" in st.session_state:
+    destination = st.session_state.pop("_navigate")
+    st.query_params.clear()
+    for key, item in destination.items():
+        if item is not None:
+            st.query_params[key] = str(item)
+    base = destination["view"] if destination["view"] in NAVIGATION else "Runs"
+    st.session_state["primary_nav"] = base
+    st.session_state["_last_nav"] = base
+
+requested = st.query_params.get("view", "Runs")
+page = ALIASES.get(requested, requested)
+if page not in [*NAVIGATION, "New run"]:
+    page = "Runs"
+base = page if page in NAVIGATION else "Runs"
+if st.session_state.get("_route_view") != page:
+    st.session_state["primary_nav"] = base
+    st.session_state["_last_nav"] = base
+st.session_state["_route_view"] = page
+st.session_state.setdefault("_last_nav", base)
+brand, utility = st.columns([5, 1.2])
+brand.markdown('<div class="wordmark">DEVSEC<span>AGENT BENCH</span></div>', unsafe_allow_html=True)
+with utility:
+    pages.preferences(home)
+nav = st.radio(
+    "Navigation",
+    NAVIGATION,
+    horizontal=True,
+    index=NAVIGATION.index(base),
+    key="primary_nav",
+    label_visibility="collapsed",
+)
+if nav != st.session_state["_last_nav"]:
+    st.session_state["_last_nav"] = nav
+    st.query_params.clear()
+    st.query_params["view"] = nav
+    st.rerun()
+st.divider()
+
+try:
     revision = database_path.stat().st_mtime_ns if database_path.exists() else 0
-    return history(str(database_path), revision)
-
-
-with st.sidebar:
-    st.markdown(
-        '<div class="brand"><span class="brand-mark">DS</span><div><div class="brand-name">DevSec Agent Bench</div><div class="brand-subtitle">Evaluation workspace</div></div></div>',
-        unsafe_allow_html=True,
+    runs = history(str(database_path), revision)
+except Exception:
+    runs = []
+    st.error(
+        "Evaluation history could not be read. Check the file and its permissions; existing data has not been changed. New evaluations also require a valid writable history directory."
     )
-    requested = st.query_params.get("view", "Overview")
-    if requested == "Benchmark Results":
-        requested = "Benchmark Runs"
-    page = st.radio(
-        "Workspace",
-        VIEWS,
-        index=VIEWS.index(requested) if requested in VIEWS else 0,
-        format_func=lambda item: f"{ICONS[item]}  {item}",
-        label_visibility="collapsed",
-    )
-    st.divider()
-    st.caption("LOCAL WORKSPACE")
-    st.caption("Eight authorized synthetic scenarios. Read-only tools. No fixture execution.")
-    if st.button("Refresh history", width="stretch"):
-        history.clear()
-    st.caption("v0.1.0 · SQLite history")
-st.query_params["view"] = page
-
-header, action = st.columns([4, 1.3])
-with header:
-    st.markdown(
-        '<div class="eyebrow">DevSec Agent Bench / Evaluation workspace</div>',
-        unsafe_allow_html=True,
-    )
-    st.title(page)
-    st.caption(DESCRIPTIONS[page])
-with action:
-    with st.popover("Run Benchmark", type="primary", width="stretch"):
-        st.markdown("**Offline reference evaluation**")
-        st.caption("Analyze trusted synthetic sources. No API key or paid model call.")
-        definitions = discover()
-        with st.form("launch-benchmark"):
-            target = st.selectbox(
-                "Benchmark scope", ["All scenarios", *[scenario.id for scenario in definitions]]
-            )
-            repetitions = st.number_input("Repetitions", min_value=1, max_value=20, value=1)
-            submitted = st.form_submit_button(
-                "Start reference run", type="primary", width="stretch"
-            )
-        if submitted:
-            defaults = st.session_state.get(
-                "offline_defaults",
-                {"max_iterations": 20, "timeout": 30.0, "concurrency": 2, "seed": 0},
-            )
-            config = AgentConfig(
-                max_iterations=int(defaults["max_iterations"]),
-                timeout=float(defaults["timeout"]),
-                seed=int(defaults["seed"]),
-            )
-            scenarios = [
-                scenario
-                for scenario in definitions
-                if target == "All scenarios" or scenario.id == target
-            ]
-            database: Database | None = None
-            try:
-                database = Database(database_path)
-                with st.spinner("Evaluating authorized repositories…"):
-                    result = run_suite(
-                        scenarios,
-                        config,
-                        repetitions=int(repetitions),
-                        concurrency=int(defaults["concurrency"]),
-                        on_update=database.save,
-                    )
-                    export(result, home / "reports")
-                st.session_state["launch_notice"] = (
-                    f"Run {result.id[:8]} recorded: {sum(item.metrics.passed for item in result.results)}/{len(result.results)} passed."
-                )
-                history.clear()
-                st.rerun()
-            except (ValueError, OSError, SQLAlchemyError):
-                st.error(
-                    "The evaluation could not be completed. Check the configured history directory and execution limits."
-                )
-            finally:
-                if database is not None:
-                    database.engine.dispose()
 
 if "launch_notice" in st.session_state:
-    st.info(st.session_state.pop("launch_notice"))
-try:
-    runs = read_history()
-except Exception:
-    st.error("Evaluation history could not be read. Check the history file and its permissions.")
-    st.stop()
-
-selected: Run | None = None
-if runs and page in {"Execution Traces", "Reports"}:
-    selected = st.selectbox(
-        "Evaluation run",
-        runs,
-        format_func=lambda run: (
-            f"{run.id[:8]} · {run.config.model or 'Reference baseline'} · {run.timestamp[:19]} UTC"
-        ),
-    )
-
-if page == "Overview":
-    pages.overview(runs)
-elif page == "Scenarios":
-    pages.scenarios(runs)
-elif page == "Settings":
-    pages.settings(str(home))
-elif not runs:
-    st.info(
-        "No recorded evaluations yet. Use Run Benchmark to create an offline reference baseline."
-    )
-elif page == "Benchmark Runs":
-    pages.benchmark_runs(runs)
-elif page == "Agent Comparison":
+    st.success(st.session_state.pop("launch_notice"))
+if page == "New run":
+    wizard.render(home, history.clear)
+elif page == "Runs":
+    run_id = st.query_params.get("run")
+    selected = next((run for run in runs if run.id == run_id), None)
+    if run_id and selected is None:
+        st.warning("That run is not in this workspace. Browse the recorded runs below.")
+    if selected:
+        inspection.render(selected)
+    else:
+        pages.runs_index(runs)
+elif page == "Benchmarks":
+    pages.benchmarks()
+elif page == "Compare":
     pages.comparison(runs)
-elif page == "Execution Traces" and selected:
-    pages.traces(selected)
-elif page == "Reports" and selected:
-    pages.reports(selected)
+else:
+    pages.documentation()
 
 st.divider()
 st.caption(
-    "Measured evidence only · Reference results are not LLM performance estimates · Secrets redacted in stored traces"
+    "Local evaluation workbench · Synthetic repositories only · Recorded evidence, never simulated results"
 )
