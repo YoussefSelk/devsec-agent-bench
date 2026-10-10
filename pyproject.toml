@@ -31,7 +31,7 @@ select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.11"
+# Follow the active interpreter; CI also checks the minimum supported Python 3.11.
 strict = true
 exclude = ["src/devsec_bench/scenarios/"]
 
