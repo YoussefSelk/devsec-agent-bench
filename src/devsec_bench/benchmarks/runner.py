@@ -5,8 +5,8 @@ import random
 import shutil
 import tempfile
 import time
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from typing import Callable
 from uuid import uuid4
 
 from devsec_bench.agents.base import Agent
@@ -16,9 +16,16 @@ from devsec_bench.models import AgentConfig, AgentOutput, Run, Scenario, Scenari
 from devsec_bench.tools.registry import Registry
 
 
-def execute(scenario: Scenario, config: AgentConfig, repetition: int, factory: Callable[[], Agent]) -> ScenarioResult:
+def execute(
+    scenario: Scenario, config: AgentConfig, repetition: int, factory: Callable[[], Agent]
+) -> ScenarioResult:
     start = time.monotonic()
-    effective = config.model_copy(update={"timeout": min(config.timeout, scenario.timeout), "max_iterations": min(config.max_iterations, scenario.max_iterations)})
+    effective = config.model_copy(
+        update={
+            "timeout": min(config.timeout, scenario.timeout),
+            "max_iterations": min(config.max_iterations, scenario.max_iterations),
+        }
+    )
     events = []
     try:
         with tempfile.TemporaryDirectory(prefix="devsec-bench-") as directory:
@@ -29,22 +36,44 @@ def execute(scenario: Scenario, config: AgentConfig, repetition: int, factory: C
             if any(p.is_symlink() for p in scenario.repository.rglob("*")):
                 raise ValueError("Fixture symlink detected")
             shutil.copytree(scenario.repository, root)
-            registry = Registry(root, scenario.tools, config.max_tool_calls, start + effective.timeout)
+            registry = Registry(
+                root, scenario.tools, config.max_tool_calls, start + effective.timeout
+            )
             events = registry.events
             output = factory().run(scenario.context(), registry, effective)
             if time.monotonic() - start > effective.timeout:
-                output = output.model_copy(update={"status": "timeout", "error": "Execution timeout"})
+                output = output.model_copy(
+                    update={"status": "timeout", "error": "Execution timeout"}
+                )
     except Exception:
         # Exception text can contain provider credentials or source values.
         output = AgentOutput(status="error", error="Scenario execution failed")
     duration = time.monotonic() - start
-    return ScenarioResult(scenario=scenario.id, name=scenario.name, repetition=repetition, output=output, metrics=evaluate(scenario.expected, output, events), events=events, duration=duration, estimated_cost=output.usage.cost(config.pricing))
+    return ScenarioResult(
+        scenario=scenario.id,
+        name=scenario.name,
+        repetition=repetition,
+        output=output,
+        metrics=evaluate(scenario.expected, output, events),
+        events=events,
+        duration=duration,
+        estimated_cost=output.usage.cost(config.pricing),
+    )
 
 
-def run_suite(scenarios: list[Scenario], config: AgentConfig, repetitions: int = 1, concurrency: int = 1, on_update: Callable[[Run], None] | None = None, factory: Callable[[], Agent] | None = None) -> Run:
+def run_suite(
+    scenarios: list[Scenario],
+    config: AgentConfig,
+    repetitions: int = 1,
+    concurrency: int = 1,
+    on_update: Callable[[Run], None] | None = None,
+    factory: Callable[[], Agent] | None = None,
+) -> Run:
     if not 1 <= repetitions <= 100 or not 1 <= concurrency <= 32:
         raise ValueError("Repetitions must be 1..100 and concurrency 1..32")
-    if config.max_cost is not None and (concurrency != 1 or repetitions != 1 or len(scenarios) != 1):
+    if config.max_cost is not None and (
+        concurrency != 1 or repetitions != 1 or len(scenarios) != 1
+    ):
         raise ValueError("Dollar-capped runs require one scenario, one repetition and one worker")
     if factory is None:
         if config.agent == "llm":
@@ -56,7 +85,7 @@ def run_suite(scenarios: list[Scenario], config: AgentConfig, repetitions: int =
             factory = ReferenceAgent
     digest = hashlib.sha256()
     for scenario in scenarios:
-        digest.update(scenario.model_dump_json().encode())
+        digest.update(scenario.model_dump_json(exclude={"repository"}).encode())
         for path in sorted(scenario.repository.rglob("*")):
             if path.is_file():
                 digest.update(path.relative_to(scenario.repository).as_posix().encode())
@@ -85,4 +114,16 @@ def run_suite(scenarios: list[Scenario], config: AgentConfig, repetitions: int =
     finally:
         # Built-in agents have cooperative tool deadlines and bounded HTTP requests.
         pool.shutdown(wait=True, cancel_futures=True)
+        if run.interrupted:
+            recorded = {(r.scenario, r.repetition) for r in run.results}
+            for future, (scenario, repetition) in futures.items():
+                if (
+                    not future.cancelled()
+                    and future.done()
+                    and (scenario.id, repetition) not in recorded
+                ):
+                    run.results.append(future.result())
+            run.results.sort(key=lambda r: (r.scenario, r.repetition))
+            if on_update:
+                on_update(run)
     return run
