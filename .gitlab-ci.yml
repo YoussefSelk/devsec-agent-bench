@@ -1,0 +1,46 @@
+image: python:3.11-slim
+stages: [quality, benchmark]
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+before_script:
+  - python -m pip install uv==0.11.26
+  - uv sync --frozen --extra dev
+quality:
+  stage: quality
+  script:
+    - uv run --frozen ruff check .
+    - uv run --frozen ruff format --check .
+    - uv run --frozen mypy src
+    - uv run --frozen pytest --junitxml=.bench/tests.xml
+    - uv build
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths: [dist/, .bench/tests.xml]
+    reports:
+      junit: .bench/tests.xml
+offline-benchmark:
+  stage: benchmark
+  script:
+    - uv run --frozen devsec-bench validate
+    - uv run --frozen devsec-bench run --agent reference --concurrency 2
+    - uv run --frozen devsec-bench report --latest
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths: [.bench/]
+    reports:
+      junit: .bench/reports/*.xml
+llm-evaluation:
+  stage: benchmark
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $RUN_LLM_EVAL == "true"'
+      when: manual
+    - when: never
+  script:
+    - test -n "$OPENAI_API_KEY" && test -n "$LLM_MODEL" && test -n "$LLM_MAX_COST"
+    - uv run --frozen devsec-bench run --agent llm --model "$LLM_MODEL" --scenario SEC-001 --max-cost "$LLM_MAX_COST" --pricing-file "$LLM_PRICING_FILE"
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths: [.bench/reports/]
