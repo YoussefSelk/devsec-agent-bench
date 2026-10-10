@@ -15,7 +15,7 @@ from devsec_bench.evaluation.comparison import compare as compare_runs
 from devsec_bench.models import Run
 
 
-def runs_index(runs: list[Run]) -> None:
+def runs_index(runs: list[Run], *, history_available: bool = True) -> None:
     title, action = st.columns([5, 1.5])
     title.title("Evaluation runs")
     title.caption(
@@ -23,6 +23,13 @@ def runs_index(runs: list[Run]) -> None:
     )
     if action.button("New run", type="primary", width="stretch"):
         new_run()
+    if not history_available:
+        st.subheader("History unavailable")
+        st.write(
+            "The saved runs could not be loaded. Open Preferences to check the history location, then restore a valid SQLite file or choose a writable history directory with the CLI's --home option."
+        )
+        st.caption("A read error does not mean your previous evaluations are empty.")
+        return
     if not runs:
         st.divider()
         st.subheader("Your first evaluation")

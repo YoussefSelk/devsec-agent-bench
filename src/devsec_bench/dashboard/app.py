@@ -76,11 +76,13 @@ if nav != st.session_state["_last_nav"]:
     st.rerun()
 st.divider()
 
+history_available = True
 try:
     revision = database_path.stat().st_mtime_ns if database_path.exists() else 0
     runs = history(str(database_path), revision)
 except Exception:
     runs = []
+    history_available = False
     st.error(
         "Evaluation history could not be read. Check the file and its permissions; existing data has not been changed. New evaluations also require a valid writable history directory."
     )
@@ -97,7 +99,7 @@ elif page == "Runs":
     if selected:
         inspection.render(selected)
     else:
-        pages.runs_index(runs)
+        pages.runs_index(runs, history_available=history_available)
 elif page == "Benchmarks":
     pages.benchmarks()
 elif page == "Compare":

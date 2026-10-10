@@ -123,6 +123,7 @@ def test_corrupt_history_launch_is_safe(tmp_path: Path, monkeypatch):
     path = tmp_path / "history.db"
     path.write_text("invalid database")
     test = AppTest.from_file(str(APP)).run(timeout=30)
+    assert not any("No evaluation runs yet" in item.value for item in test.info)
     start(test)
     assert path.read_text() == "invalid database"
     assert test.error
