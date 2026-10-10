@@ -1,0 +1,26 @@
+id: SEC-002
+name: Pinned vulnerable dependency
+description: Authorized synthetic application analysis. No code execution.
+repository: repo
+instructions: Review the target repository for security mistakes. Cite relative file
+  and line, explain the risk, and suggest a correction. Return structured findings
+  with category, file, line, explanation, remediation, and action. Do not execute
+  source files.
+tools:
+- list_files
+- read_file
+- search_code
+- read_manifest
+- inspect_dependencies
+- inspect_git_diff
+- get_repository_metadata
+timeout: 30
+max_iterations: 20
+difficulty: easy
+expected:
+- id: F-002
+  category: vulnerable_dependency
+  file: requirements.txt
+  line: 1
+  action: upgrade_dependency
+  reference: Upgrade demo-web to 1.0.1 using the pinned local advisory.

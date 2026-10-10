@@ -1,0 +1,27 @@
+id: SEC-008
+name: CI secret disclosure
+description: Authorized synthetic application analysis. No code execution.
+repository: repo
+instructions: Review the target repository for security mistakes. Cite relative file
+  and line, explain the risk, and suggest a correction. Return structured findings
+  with category, file, line, explanation, remediation, and action. Do not execute
+  source files.
+tools:
+- list_files
+- read_file
+- search_code
+- read_manifest
+- inspect_dependencies
+- inspect_git_diff
+- get_repository_metadata
+timeout: 30
+max_iterations: 20
+difficulty: medium
+expected:
+- id: F-008
+  category: ci_secret_handling
+  file: .gitlab-ci.yml
+  line: 3
+  action: protect_ci_secret
+  reference: Remove secret echo, use masked protected CI variables, and disable shell
+    tracing.

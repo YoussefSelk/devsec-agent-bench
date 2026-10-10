@@ -1,0 +1,3 @@
+API_PASSWORD = "SYNTHETIC_DEMO_ONLY"
+def connect():
+    return API_PASSWORD
