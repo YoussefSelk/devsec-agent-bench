@@ -37,7 +37,9 @@ h2,h3 {letter-spacing:-.02em}
 [data-testid=stCaptionContainer] {color:#94A3B8}
 [data-testid=stMetric] {background:#161E2D;border:1px solid #2A3546;border-radius:9px;padding:1.1rem;min-height:115px}
 [data-testid=stMetricLabel] {color:#94A3B8;font-size:.8rem}
-[data-testid=stMetricValue] {font-size:1.85rem;font-weight:600;letter-spacing:-.03em;color:#F1F5F9}
+[data-testid=stMetricValue] {font-size:1.6rem;font-weight:600;letter-spacing:-.03em;color:#F1F5F9}
+div[data-testid=stHorizontalBlock]:has(div[data-testid=stMetric]){flex-wrap:wrap}
+div[data-testid=stColumn]:has(div[data-testid=stMetric]){min-width:190px;flex:1 1 190px}
 [data-testid=stVerticalBlockBorderWrapper] > div {border-color:#2A3546!important;border-radius:9px}
 [data-testid=stDataFrame] {border:1px solid #2A3546;border-radius:8px}
 [data-testid=stSidebar] label:has(input:checked) {background:#1E293B;border-radius:6px}
@@ -51,8 +53,7 @@ h2,h3 {letter-spacing:-.02em}
 @media(max-width:900px){.block-container{padding:4rem 1rem 2rem}h1{font-size:1.65rem!important}
 div[data-testid=stHorizontalBlock]:has(div[data-testid=stPopover]){flex-wrap:wrap}
 div[data-testid=stColumn]:has(div[data-testid=stPopover]){min-width:160px;flex:1 1 160px}
-div[data-testid=stHorizontalBlock]:has(div[data-testid=stMetric]){flex-wrap:wrap}
-div[data-testid=stColumn]:has(div[data-testid=stMetric]){min-width:160px;flex:1 1 160px}}
+}
 </style>
 """
 
